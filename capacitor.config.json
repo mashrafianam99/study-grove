@@ -1,0 +1,6 @@
+{
+  "appId": "com.mashrafi.studygrove",
+  "appName": "Study Grove",
+  "webDir": "www",
+  "android": { "backgroundColor": "#0E181A" }
+}

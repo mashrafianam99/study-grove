@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Study Grove</string>
+    <string name="title_activity_main">Study Grove</string>
+    <string name="package_name">com.mashrafi.studygrove</string>
+    <string name="custom_url_scheme">com.mashrafi.studygrove</string>
+</resources>

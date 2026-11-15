@@ -66,3 +66,21 @@ Add `?fast` to the address (http://localhost:5173/?fast) and minutes become seco
 | `vendor/three/`, `fonts/`, `css/fonts.css` | Bundled Three.js 0.160.0 (MIT) and fonts (OFL) |
 | `serve.json`, `vercel.json` | Security headers for the local server and for hosting |
 | `start.cmd`, `start-phone.cmd` | Run on this computer only, or share on trusted Wi-Fi |
+
+## Android app
+
+**Download:** get `study-grove.apk` from the [latest release](https://github.com/mashrafianam99/study-grove/releases/latest). Open it on your phone and allow "install unknown apps" when Android asks.
+
+The Android app is a Capacitor wrapper that ships the same files inside the APK, so it works fully offline. Its data is separate from the browser version.
+
+### Building it yourself
+
+Needs JDK 21 and the Android SDK (Gradle 8.14 can't run on Java 25 yet).
+
+```sh
+npm install
+npm run android:apk   # -> android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+`npm run android:sync` copies web changes into `android/` without building, for use with Android Studio.
+Icons and the splash screen come from `assets/logo.png`. To regenerate them, run `npx @capacitor/assets generate --android`.
