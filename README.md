@@ -75,8 +75,8 @@ The Android app is a Capacitor wrapper that ships the same files inside the APK,
 
 The app adds two phone-only features:
 
-- **Live focus timer.** While a session runs, a countdown notification shows in the status bar, on the lock screen, and as an Android 16 Live Update (the Super Island on HyperOS, where Xiaomi allows it), with Pause / Resume / End buttons. An alarm announces the end even if the app is closed. Allow notifications when asked; for an on-time end alert also allow *Alarms & reminders* for Study Grove in Android settings.
-- **Exams in your calendar.** Adding an exam puts it in a phone-only "Study Grove exams" calendar that the phone's Calendar app shows, with reminders at 12 pm and 8 pm every day until the night before. Deleting or changing the exam updates the calendar. The calendar never syncs to an online account, and the app only touches events it created.
+- **Live focus timer.** Starting a session also starts a timer in the phone's own Clock app, so the countdown shows in the Super Island (HyperOS), the notification shade and the lock screen, and the Clock rings at the end. Pause and end sessions in Study Grove: it then opens the Clock's timer screen, because most Clock apps don't let other apps pause their timer. A session survives closing the app. Phones without a Clock app that accepts timers get Study Grove's own countdown notification instead.
+- **Exams in your calendar.** Adding an exam puts it in a phone-only "Study Grove exams" calendar that the phone's Calendar app shows: a reminder at 8 am on the exam day, and at 12 pm and 8 pm every day before it, ending with "Exam tomorrow" the night before. On Xiaomi phones the Calendar's *Alarm reminders* switch is turned on too. Deleting or changing the exam updates the calendar. The calendar never syncs to an online account, and the app only touches events it created.
 
 ### Building it yourself
 
