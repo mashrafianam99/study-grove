@@ -412,6 +412,10 @@ function route() {
   const name = location.hash.slice(1);
   ui.route = ROUTES.includes(name) ? name : 'today';
   document.body.dataset.route = ui.route;
+  // The phone settings icon doubles as a close button while settings is open.
+  const gear = $('.top-settings');
+  gear.href = ui.route === 'settings' ? '#today' : '#settings';
+  gear.setAttribute('aria-label', ui.route === 'settings' ? 'Close settings' : 'Settings');
   ui.confirm = null;
   $('#tree-tip').hidden = true;
   render();
@@ -479,6 +483,14 @@ function bindEvents() {
 }
 
 /* ---------- boot ---------- */
+
+// Called by the Android back button (MainActivity). Returns true when the app handled it;
+// false lets Android leave the app, like any app on its home tab.
+window.studyGroveBack = () => {
+  if (ui.focusOpen) { closeFocus(); return true; }
+  if (ui.route !== 'today') { location.replace('#today'); return true; }
+  return false;
+};
 
 function boot() {
   store.subscribe(render);
