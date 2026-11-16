@@ -6,9 +6,11 @@ import { toast, leafBurst, icon } from './ui.js';
 import { dateKey, fmtLong, fmtMinutes, esc, prefersReducedMotion } from './util.js';
 import { currentStreak, levelInfo, greeting } from './stats.js';
 import { dueReviews, INTERVALS } from './srs.js';
+import * as native from './native.js';
 
 const ROUTES = ['today', 'subjects', 'reviews', 'exams', 'stats', 'settings'];
 const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
+const TIMER_KEY = 'study-grove:timer';
 const $ = (sel) => document.querySelector(sel);
 
 const ui = {
@@ -157,6 +159,7 @@ function renderTimer() {
 }
 
 function updateClock(snap) {
+  persistTimer();
   if (snap.status !== lastStatus) {
     renderTimer();
     return;
@@ -212,6 +215,7 @@ function handleComplete(done) {
 
 function startFocus() {
   primeAudio();
+  native.askNotifications();
   ui.activeSubject = ui.selSubject;
   ui.activeTopic = ui.selTopic;
   ui.pendingBreak = false;
@@ -256,6 +260,121 @@ function toggleTimer() {
   if (status === 'running') timer.pause();
   else if (status === 'paused') timer.resume();
   else if (!ui.pendingBreak) startFocus();
+}
+
+/* ---------- timer outside the app ---------- */
+
+let savedTimerKey = '';
+// The Clock app's timer mirrors a running session: clockEndAt is the end time it was started for.
+let clockMode = false;
+let clockEndAt = 0;
+let timerRestored = false; // until restore runs, an idle timer must not wipe the saved session
+
+// Saves the running session (so closing the app doesn't lose it) and mirrors it to the
+// Android notification. Runs on every tick but only does work when the timer state changed.
+function persistTimer() {
+  if (!timerRestored) return;
+  const t = timer.save();
+  const key = JSON.stringify(t);
+  if (key === savedTimerKey) return;
+  savedTimerKey = key;
+  const subject = store.getState().subjects.find((s) => s.id === ui.activeSubject);
+  const live = { ...t, title: t.kind === 'break' ? 'Break' : (subject?.name ?? 'Focus') };
+  mirrorToClock(live);
+  try {
+    if (t.status === 'idle') localStorage.removeItem(TIMER_KEY);
+    else localStorage.setItem(TIMER_KEY, JSON.stringify({ ...t, subject: ui.activeSubject, topic: ui.activeTopic, clockMode, clockEndAt, savedAt: Date.now() }));
+  } catch { /* storage blocked: the session just won't survive a restart */ }
+  // A running countdown is shown by the Clock app, or by our notification only once the Clock
+  // app declined (see mirrorToClock); a paused one only when the Clock app isn't in use.
+  if (t.status === 'idle' || (t.status === 'paused' && !clockMode)) native.showLive(live);
+}
+
+function mirrorToClock(live) {
+  if (live.status === 'running') {
+    if (clockEndAt === live.endAt) return; // already running there (also after a restart)
+    clockEndAt = live.endAt;
+    const seconds = Math.max(1, Math.round((live.endAt - Date.now()) / 1000));
+    native.startClockTimer(seconds, `Study Grove: ${live.title}`).then((ok) => {
+      if (clockEndAt !== live.endAt) return; // paused or ended meanwhile
+      // clockEndAt stays set either way, so a failed attempt isn't retried every tick.
+      clockMode = ok;
+      if (!ok) native.showLive(live); // no Clock app took it: use Study Grove's own notification
+      savedTimerKey = ''; // re-save with the Clock state
+      persistTimer();
+    });
+    return;
+  }
+  if (!clockEndAt) {
+    if (live.status === 'idle') clockMode = false;
+    return;
+  }
+  const wasClock = clockMode;
+  const early = clockEndAt > Date.now() + 2000;
+  clockEndAt = 0;
+  if (live.status === 'idle') clockMode = false;
+  if (early && wasClock) {
+    const verb = live.status === 'paused' ? 'pause' : 'cancel';
+    native.dismissClockTimer().then(({ dismissed, opened }) => {
+      if (dismissed) return;
+      toast(opened
+        ? `Your Clock app is open: ${verb} its timer there too, then come back.`
+        : `Also ${verb} the timer in your Clock app.`);
+    });
+  }
+}
+
+async function restoreTimer() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(TIMER_KEY)); } catch { /* corrupt or blocked */ }
+  // The notification buttons may have paused, resumed or ended the session while the app was closed.
+  const nat = await native.nativeTimerState();
+  timerRestored = true;
+  // Only Study Grove's own notification has buttons; with the Clock app in charge, ignore it.
+  if (nat?.updatedAt && saved && !saved.clockMode && nat.updatedAt > (saved.savedAt ?? 0)) {
+    if (nat.status === 'idle' && saved.kind === 'focus' && nat.endedEarlyMs >= 60000) {
+      ui.activeSubject = saved.subject ?? '';
+      ui.activeTopic = saved.topic ?? '';
+      ui.pendingBreak = true;
+      logFocus(Math.floor(nat.endedEarlyMs / 60000), dateKey(new Date(nat.updatedAt)));
+    }
+    saved = nat.status === 'idle' ? null : { ...saved, ...nat };
+  }
+  if (!saved) { persistTimer(); return; }
+  ui.activeSubject = typeof saved.subject === 'string' ? saved.subject : '';
+  ui.activeTopic = typeof saved.topic === 'string' ? saved.topic : '';
+  clockMode = saved.clockMode === true;
+  clockEndAt = Number.isFinite(saved.clockEndAt) ? saved.clockEndAt : 0;
+  timer.restore(saved);
+  persistTimer();
+}
+
+function liveAction(action) {
+  if (timer.get().status === 'idle') return; // e.g. already ended by the alarm
+  if (action === 'pause') timer.pause();
+  else if (action === 'resume') timer.resume();
+  else if (action === 'stop') finishEarly();
+}
+
+/* ---------- exams in the phone calendar ---------- */
+
+let calendarKey = '';
+let calendarWarned = false;
+
+function syncCalendar(state) {
+  const exams = state.exams.filter((e) => !e.ex).map((e) => {
+    const subject = state.subjects.find((s) => s.id === e.subjectId);
+    return { id: e.id, date: e.date, title: subject ? `${subject.name}: ${e.name}` : e.name };
+  });
+  const key = JSON.stringify(exams);
+  if (key === calendarKey) return;
+  calendarKey = key;
+  native.syncExamCalendar(exams).then((status) => {
+    if (status === 'denied' && exams.length && !calendarWarned) {
+      calendarWarned = true;
+      toast('Calendar access is off, so exams are not added to your calendar. You can allow it in Android settings.', 'warn');
+    }
+  });
 }
 
 /* ---------- actions ---------- */
@@ -494,8 +613,12 @@ window.studyGroveBack = () => {
 
 function boot() {
   store.subscribe(render);
+  store.subscribe(syncCalendar);
   bindEvents();
   route();
+  native.onLiveAction(liveAction);
+  restoreTimer();
+  syncCalendar(store.getState());
   if (!store.canSave()) toast('This browser is blocking storage, so changes will not be saved.', 'warn');
   import('./grove.js')
     .then(({ createGrove }) => {

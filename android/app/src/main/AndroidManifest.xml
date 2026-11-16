@@ -21,6 +21,9 @@
             </intent-filter>
         </activity>
 
+        <!-- Focus timer notification buttons and end alarm. Not exported: other apps can't trigger it. -->
+        <receiver android:name=".FocusReceiver" android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -33,4 +36,13 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Live focus timer: notification, Android 16 Live Update chip/island, on-time end alarm. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- Start / dismiss the focus timer in the phone's own Clock app (normal permission, no prompt). -->
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+    <!-- Exams and their 12 pm / 8 pm reminders in the phone's calendar. -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <uses-permission android:name="android.permission.WRITE_CALENDAR" />
 </manifest>

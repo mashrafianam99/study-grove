@@ -2,6 +2,7 @@
 // The timer counts against a fixed end time, so it stays correct when the phone sleeps the tab.
 
 const TICK_MS = 250;
+const MAX_SESSION_MS = 4 * 60 * 60000; // settings cap focus at 180 min
 // ?fast in the URL turns minutes into seconds, for trying the flow quickly.
 const SPEED = new URLSearchParams(location.search).has('fast') ? 60 : 1;
 
@@ -102,6 +103,22 @@ export function createTimer({ onTick, onComplete }) {
       return done;
     },
     get: snapshot,
+    // Raw state for saving, so a session survives the app being closed.
+    save: () => ({ status, kind, totalMs, endAt, remainingMs }),
+    // Picks a saved session back up; if it ended while the app was closed it completes right away.
+    restore(s) {
+      if (!s || !['running', 'paused'].includes(s.status) || !['focus', 'break'].includes(s.kind)) return;
+      const nums = [s.totalMs, s.endAt, s.remainingMs];
+      if (!nums.every(Number.isFinite) || s.totalMs <= 0 || s.totalMs > MAX_SESSION_MS) return;
+      ({ status, kind, totalMs, endAt } = s);
+      remainingMs = Math.min(Math.max(0, s.remainingMs), totalMs);
+      clearInterval(interval);
+      if (status === 'running') {
+        interval = setInterval(step, TICK_MS);
+        holdScreen(true);
+        step();
+      } else onTick?.(snapshot());
+    },
   };
 }
 

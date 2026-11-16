@@ -73,6 +73,11 @@ Add `?fast` to the address (http://localhost:5173/?fast) and minutes become seco
 
 The Android app is a Capacitor wrapper that ships the same files inside the APK, so it works fully offline. Its data is separate from the browser version.
 
+The app adds two phone-only features:
+
+- **Live focus timer.** While a session runs, a countdown notification shows in the status bar, on the lock screen, and as an Android 16 Live Update (the Super Island on HyperOS, where Xiaomi allows it), with Pause / Resume / End buttons. An alarm announces the end even if the app is closed. Allow notifications when asked; for an on-time end alert also allow *Alarms & reminders* for Study Grove in Android settings.
+- **Exams in your calendar.** Adding an exam puts it in a phone-only "Study Grove exams" calendar that the phone's Calendar app shows, with reminders at 12 pm and 8 pm every day until the night before. Deleting or changing the exam updates the calendar. The calendar never syncs to an online account, and the app only touches events it created.
+
 ### Building it yourself
 
 Needs JDK 21 and the Android SDK (Gradle 8.14 can't run on Java 25 yet).
